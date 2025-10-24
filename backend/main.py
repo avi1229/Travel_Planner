@@ -3,39 +3,34 @@ from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pymongo import MongoClient
-import uuid, os, httpx
-from pydantic import BaseModel
+from ollama import chat
+import uuid, os
 
 app = FastAPI()
-
-class AIRequest(BaseModel):
-    question: str
 
 # ---- CORS ----
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],  # your frontend dev server
+    allow_origins=["http://localhost:5173"],
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# ---- MongoDB ----
+# ---- Mongo ----
 client = MongoClient("mongodb://localhost:27017/")
 db = client["traveller_journey"]
 collection = db["destinations"]
 
-# ---- Upload Directory ----
 UPLOAD_DIR = "uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
-
-app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
+app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
 @app.get("/")
 async def root():
-    return {"message": "✅ Server running on port 8000"}
+    return {"message": "Server running on port 8000"}
 
-# ---- Upload Destination ----
+
 @app.post("/upload_destination")
 async def upload_destination(
     name: str = Form(...),
@@ -44,31 +39,30 @@ async def upload_destination(
     image: UploadFile = Form(...),
     image_360: UploadFile = Form(...),
 ):
-    # Save both images
-    def save_file(file):
-        filename = f"{uuid.uuid4()}_{file.filename}"
-        path = os.path.join(UPLOAD_DIR, filename)
-        with open(path, "wb") as f:
-            f.write(file.file.read())
-        return f"/uploads/{filename}"
+    filename_normal = f"{uuid.uuid4()}_{image.filename}"
+    filename_360 = f"{uuid.uuid4()}_{image_360.filename}"
 
-    image_url = save_file(image)
-    image_360_url = save_file(image_360)
+    path_normal = os.path.join(UPLOAD_DIR, filename_normal)
+    path_360 = os.path.join(UPLOAD_DIR, filename_360)
+
+    with open(path_normal, "wb") as f:
+        f.write(await image.read())
+
+    with open(path_360, "wb") as f:
+        f.write(await image_360.read())
 
     doc = {
         "name": name,
         "category": category,
         "description": description,
-        "image_url": image_url,
-        "image_360_url": image_360_url,
+        "image_url": f"/uploads/{filename_normal}",
+        "image_360_url": f"/uploads/{filename_360}",
     }
 
-    result = collection.insert_one(doc)
-    doc["_id"] = str(result.inserted_id)
-
+    collection.insert_one(doc)
     return {"message": "Destination uploaded", "data": doc}
 
-# ---- Get Destinations ----
+
 @app.get("/destinations")
 def get_destinations(category: str = None):
     query = {}
@@ -77,23 +71,26 @@ def get_destinations(category: str = None):
     items = list(collection.find(query, {"_id": 0}))
     return {"destinations": items}
 
-# ---- Proxy to Ollama ----
 
+# ---- Ask AI (Ollama Python SDK) ----
 @app.post("/ask_ai")
-async def ask_ai(data: AIRequest):
+async def ask_ai(question: str):
     try:
-        async with httpx.AsyncClient() as client:
-            response = await client.post(
-                "http://localhost:11434/api/generate",
-                json={
-                    "model": "llama3",
-                    "prompt": data.question,
-                    "stream": False,
-                },
-                timeout=120.0,
-            )
+        if not question:
+            return JSONResponse({"error": "Missing question"}, status_code=400)
 
-            result = response.json()
-            return {"answer": result.get("response", "No response from Ollama")}
+        # 💬 Use Ollama Python SDK directly
+        response = chat(
+            model="llama3",  # or gemma3, or any other model you have
+            messages=[
+                {"role": "user", "content": question},
+            ],
+        )
+
+        # Extract the model’s message content
+        ai_reply = response.message.content
+
+        return {"response": ai_reply}
+
     except Exception as e:
-        return {"error": str(e)}
+        return JSONResponse({"error": str(e)}, status_code=500)
