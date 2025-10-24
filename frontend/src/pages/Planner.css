@@ -1,0 +1,56 @@
+.planner-container {
+  text-align: center;
+  padding: 3rem 2rem;
+  background: linear-gradient(to bottom, #fdfbfb, #ebedee);
+  min-height: 80vh;
+}
+
+.intent-section h2 {
+  font-size: 1.8rem;
+  margin-bottom: 2rem;
+  color: #333;
+}
+
+.intent-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 1rem;
+}
+
+.intent-btn {
+  width: 180px;
+  height: 50px;
+  font-size: 1rem;
+}
+
+.destinations-section {
+  margin-top: 2rem;
+}
+
+.destinations-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 2rem;
+  margin-top: 2rem;
+  justify-items: center;
+}
+
+.destination-card {
+  width: 320px;
+  border-radius: 1rem;
+  overflow: hidden;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.destination-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.15);
+}
+
+.destination-image {
+  width: 100%;
+  height: 180px;
+  object-fit: cover;
+  border-radius: 1rem 1rem 0 0;
+}

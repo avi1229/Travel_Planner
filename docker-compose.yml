@@ -1,0 +1,37 @@
+version: "3.9"
+services:
+  mongo:
+    image: mongo:6
+    container_name: travel_mongo
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+
+  backend:
+    build: ./backend
+    container_name: travel_backend
+    environment:
+      MONGO_URL: mongodb://mongo:27017
+      SECRET_KEY: supersecret
+    ports:
+      - "8000:8000"
+    depends_on:
+      - mongo
+    volumes:
+      - ./backend/app:/app
+
+  frontend:
+    build:
+      context: ./frontend
+    container_name: travel_frontend
+    command: npm run dev
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+    depends_on:
+      - backend
+
+volumes:
+  mongo_data:
