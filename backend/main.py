@@ -54,7 +54,7 @@ async def upload_destination(
     doc = {
         "name": name,
         "category": category,
-        "description":de
+        "description":description,
         "image_url": f"/uploads/{filename}",
     }
     collection.insert_one(doc)
