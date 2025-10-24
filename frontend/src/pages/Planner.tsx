@@ -1,12 +1,15 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "primereact/button";
 import { Card } from "primereact/card";
 import { InputText } from "primereact/inputtext";
 import { useNavigate } from "react-router-dom";
+import axios from "axios";
 import "./Planner.css";
 
 export default function Planner() {
   const [intent, setIntent] = useState<string | null>(null);
+  const [destinations, setDestinations] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
   const [showChat, setShowChat] = useState(false);
   const [messages, setMessages] = useState<{ sender: string; text: string }[]>([]);
   const [input, setInput] = useState("");
@@ -19,45 +22,73 @@ export default function Planner() {
     { key: "weekend", label: "Short Weekend" },
     { key: "family", label: "Family" },
   ];
+//    const destinations = [
+//     {
+//       id: 1,
+//       name: "Red Rock Canyon National Conservation Area",
+//       intent: "adventure",
+//       image:
+//         "https://www.redrockcanyonlv.org/wp-content/uploads/2012/09/red-rock-canyon6-550x550.jpg",
+//       description:
+//         "Natural wonder with red rocks draws those looking to hike, rock climb or go for a scenic drive.",
+//     },
+//     {
+//       id: 2,
+//       name: "Goa Beaches",
+//       intent: "relaxation",
+//       image:
+//         "https://360-degree-beach-resort.goa-india-hotels-resorts.com/data/Photos/OriginalPhoto/2144/214456/214456799.JPEG",
+//       description: "Golden sands, palm trees, beach shacks, and seafood bliss.",
+//     },
+//   ];
 
-  const destinations = [
-    {
-      id: 1,
-      name: "Red Rock Canyon National Conservation Area",
-      intent: "adventure",
-      image:
-        "https://www.redrockcanyonlv.org/wp-content/uploads/2012/09/red-rock-canyon6-550x550.jpg",
-      description:
-        "Natural wonder with red rocks draws those looking to hike, rock climb or go for a scenic drive.",
-    },
-    {
-      id: 2,
-      name: "Goa Beaches",
-      intent: "relaxation",
-      image:
-        "https://360-degree-beach-resort.goa-india-hotels-resorts.com/data/Photos/OriginalPhoto/2144/214456/214456799.JPEG",
-      description: "Golden sands, palm trees, beach shacks, and seafood bliss.",
-    },
-  ];
+  // 🧠 Fetch destinations from FastAPI
+  useEffect(() => {
+    const fetchDestinations = async () => {
+      try {
+        setLoading(true);
+        const url = intent
+          ? `http://localhost:8000/destinations?category=${intent}`
+          : `http://localhost:8000/destinations`;
+        const res = await axios.get(url);
+        setDestinations(res.data.destinations);
+      } catch (err) {
+        console.error("Error fetching destinations:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  const filtered = intent ? destinations.filter((d) => d.intent === intent) : [];
+    // fetch only after selecting intent
+    if (intent) fetchDestinations();
+  }, [intent]);
 
   // ---- AI Chat functions ----
   const sendMessage = async () => {
-    if (!input.trim()) return;
-    const userMessage = { sender: "user", text: input };
-    setMessages((prev) => [...prev, userMessage]);
-    setInput("");
+  if (!input.trim()) return;
+  const userMessage = { sender: "user", text: input };
+  setMessages((prev) => [...prev, userMessage]);
+  setInput("");
 
-    // Mock AI response
-    setTimeout(() => {
-      const aiMessage = {
-        sender: "ai",
-        text: `🤖 For ${intent} trips, I’d recommend exploring unique destinations!`,
-      };
-      setMessages((prev) => [...prev, aiMessage]);
-    }, 800);
-  };
+  try {
+    const res = await fetch("http://localhost:8000/ask_ai", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ question: input }),
+    });
+
+    const data = await res.json();
+    const aiReply = data.response || data.message || data.output || "Sorry, I couldn’t generate a response.";
+    setMessages((prev) => [...prev, { sender: "ai", text: aiReply }]);
+  } catch (err) {
+    console.error("AI connection failed:", err);
+    setMessages((prev) => [
+      ...prev,
+      { sender: "ai", text: "⚠️ Sorry, something went wrong connecting to AI." },
+    ]);
+  }
+};
+
 
   // ---- Render ----
   return (
@@ -81,30 +112,41 @@ export default function Planner() {
       {intent && (
         <div className="destinations-section">
           <h2>Recommended Destinations for {intent}</h2>
-          <div className="destinations-grid">
-            {filtered.map((d) => (
-              <Card
-                key={d.id}
-                title={d.name}
-                subTitle={d.description}
-                header={
-                  <img
-                    alt={d.name}
-                    src={d.image}
-                    className="destination-image"
-                  />
-                }
-                className="destination-card"
-              >
-                <Button
-                  label="Explore in 360°"
-                  icon="pi pi-compass"
-                  className="p-button-sm"
-                  onClick={() => navigate(`/destination/${d.id}`)}
-                />
-              </Card>
-            ))}
-          </div>
+
+          {loading ? (
+            <p>Loading destinations...</p>
+          ) : destinations.length === 0 ? (
+            <p>No destinations found for this category.</p>
+          ) : (
+            <div className="destinations-grid">
+              {destinations.map((d, idx) => (
+                <Card
+                  key={idx}
+                  title={d.name}
+                  subTitle={d.description}
+                  header={
+                    <img
+                      alt={d.name}
+                      src={`http://localhost:8000${d.image_url}`}
+                      className="destination-image"
+                    />
+                  }
+                  className="destination-card"
+                >
+                  <Button
+                    label="Explore in 360°"
+                    icon="pi pi-compass"
+                    className="p-button-sm"
+                    onClick={() =>
+                        navigate(`/destination/${d.name}`, {
+                        state: { destination: d }, // pass destination data
+                        })
+                    }
+                    />
+                </Card>
+              ))}
+            </div>
+          )}
 
           <div className="flex justify-content-between mt-4">
             <Button

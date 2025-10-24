@@ -40,7 +40,17 @@ export default function AdminPage() {
 
     try {
       const res = await axios.post("http://localhost:8000/upload_destination", formData);
-      toast.current?.show({ severity: "success", summary: "Uploaded", detail: res.data.message });
+      toast.current?.show({
+        severity: "success",
+        summary: "Uploaded",
+        detail: res.data.message,
+      });
+      // Reset form
+      setName("");
+      setCategory("");
+      setDescription("");
+      setImage(null);
+      setImage360(null);
     } catch (err) {
       toast.current?.show({ severity: "error", summary: "Error", detail: "Upload failed" });
     }
@@ -77,21 +87,13 @@ export default function AdminPage() {
       </div>
 
       <div className="p-field mb-3">
-        <label>Thumbnail Image (for card)</label>
-        <input
-          type="file"
-          accept="image/*"
-          onChange={(e) => setImage(e.target.files?.[0] || null)}
-        />
+        <label>Thumbnail Image (Card)</label>
+        <input type="file" accept="image/*" onChange={(e) => setImage(e.target.files?.[0] || null)} />
       </div>
 
       <div className="p-field mb-3">
-        <label>360° Image (for explore view)</label>
-        <input
-          type="file"
-          accept="image/*"
-          onChange={(e) => setImage360(e.target.files?.[0] || null)}
-        />
+        <label>360° Image (Explore View)</label>
+        <input type="file" accept="image/*" onChange={(e) => setImage360(e.target.files?.[0] || null)} />
       </div>
 
       <Button label="Upload Destination" icon="pi pi-upload" onClick={handleUpload} />
