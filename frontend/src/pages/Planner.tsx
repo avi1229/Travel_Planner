@@ -63,50 +63,59 @@ export default function Planner() {
     if (intent) fetchDestinations();
   }, [intent]);
 
-  // ---- AI Chat functions ----
-  const sendMessage = async () => {
+const sendMessage = async () => {
   if (!input.trim()) return;
 
-  // Add user message
   const userMessage = { sender: "user", text: input };
   setMessages((prev) => [...prev, userMessage]);
   setInput("");
 
-  // Add temporary "loading" message
-  const loadingMessage = { sender: "ai", text: "🤖 Thinking..." };
-  setMessages((prev) => [...prev, loadingMessage]);
+  // Add AI placeholder + loading
+  setMessages((prev) => [...prev, { sender: "ai", text: "..." }]);
+  setLoading(true);
 
   try {
-    const res = await fetch("http://localhost:8000/ask_ai", {
+    const response = await fetch("http://localhost:8000/ask_ai", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ question: userMessage.text }),
+      body: JSON.stringify({ question: input }),
     });
 
-    const data = await res.json();
+    if (!response.ok) throw new Error("Network error");
 
-    // Remove loading message and add AI response
-    setMessages((prev) =>
-      prev
-        .filter((msg) => msg.text !== "🤖 Thinking...")
-        .concat({
-          sender: "ai",
-          text: data.answer || data.response || "⚠️ Sorry, I couldn’t generate a response.",
-        })
-    );
+    // ✅ Type-safe null check
+    if (!response.body) {
+      throw new Error("No response body received from server");
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let aiText = "";
+
+    // Stream chunks as they come in
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      aiText += decoder.decode(value, { stream: true });
+
+      setMessages((prev) => {
+        const updated = [...prev];
+        updated[updated.length - 1] = { sender: "ai", text: aiText };
+        return updated;
+      });
+    }
+
   } catch (err) {
     console.error("AI connection failed:", err);
-
-    setMessages((prev) =>
-      prev
-        .filter((msg) => msg.text !== "🤖 Thinking...")
-        .concat({
-          sender: "ai",
-          text: "⚠️ Sorry, something went wrong connecting to AI.",
-        })
-    );
+    setMessages((prev) => [
+      ...prev,
+      { sender: "ai", text: "⚠️ Sorry, something went wrong connecting to AI." },
+    ]);
+  } finally {
+    setLoading(false);
   }
 };
+
 
 
 

@@ -6,6 +6,10 @@ from pymongo import MongoClient
 from ollama import chat
 from pydantic import BaseModel
 import uuid, os
+from fastapi.responses import StreamingResponse, JSONResponse
+import httpx
+import json
+import asyncio
 
 app = FastAPI()
 
@@ -77,11 +81,35 @@ def get_destinations(category: str = None):
 
 # ---- Ask AI (Ollama Python SDK) ----
 @app.post("/ask_ai")
-async def ask_ai(data: AIRequest):
-    try:
-        response = chat(model="llama3:latest", messages=[
-            {"role": "user", "content": data.question}
-        ])
-        return {"answer": response["message"]["content"]}
-    except Exception as e:
-        return {"error": str(e)}
+async def ask_ai(request: Request):
+    """
+    Stream AI responses word-by-word from Ollama model
+    """
+    data = await request.json()
+    question = data.get("question", "")
+
+    if not question:
+        return JSONResponse({"error": "Missing question"}, status_code=400)
+
+    async def generate():
+        try:
+            async with httpx.AsyncClient(timeout=None) as client:
+                async with client.stream(
+                    "POST",
+                    "http://localhost:11434/api/generate",
+                    json={"model": "llama3", "prompt": question, "stream": True},
+                ) as response:
+                    async for line in response.aiter_lines():
+                        if line.strip():
+                            try:
+                                obj = json.loads(line)
+                                content = obj.get("response")
+                                if content:
+                                    yield content
+                                    await asyncio.sleep(0.02)  # smooth output pacing
+                            except json.JSONDecodeError:
+                                pass
+        except Exception as e:
+            yield f"\n[Error connecting to Ollama: {str(e)}]"
+
+    return StreamingResponse(generate(), media_type="text/plain")
