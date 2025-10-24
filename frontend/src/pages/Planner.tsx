@@ -1,11 +1,15 @@
 import { useState } from "react";
 import { Button } from "primereact/button";
 import { Card } from "primereact/card";
+import { InputText } from "primereact/inputtext";
 import { useNavigate } from "react-router-dom";
 import "./Planner.css";
 
 export default function Planner() {
   const [intent, setIntent] = useState<string | null>(null);
+  const [showChat, setShowChat] = useState(false);
+  const [messages, setMessages] = useState<{ sender: string; text: string }[]>([]);
+  const [input, setInput] = useState("");
   const navigate = useNavigate();
 
   const travelIntents = [
@@ -21,24 +25,43 @@ export default function Planner() {
       id: 1,
       name: "Red Rock Canyon National Conservation Area",
       intent: "adventure",
-      image: "https://www.redrockcanyonlv.org/wp-content/uploads/2012/09/red-rock-canyon6-550x550.jpg", 
-      description: "Natural wonder with red rocks draws those looking to hike, rock climb or go for a scenic drive.",
+      image:
+        "https://www.redrockcanyonlv.org/wp-content/uploads/2012/09/red-rock-canyon6-550x550.jpg",
+      description:
+        "Natural wonder with red rocks draws those looking to hike, rock climb or go for a scenic drive.",
     },
     {
       id: 2,
       name: "Goa Beaches",
       intent: "relaxation",
-      image: "https://360-degree-beach-resort.goa-india-hotels-resorts.com/data/Photos/OriginalPhoto/2144/214456/214456799.JPEG", // Replace with 360 image link
+      image:
+        "https://360-degree-beach-resort.goa-india-hotels-resorts.com/data/Photos/OriginalPhoto/2144/214456/214456799.JPEG",
       description: "Golden sands, palm trees, beach shacks, and seafood bliss.",
     },
   ];
 
-  const filtered = intent
-    ? destinations.filter((d) => d.intent === intent)
-    : [];
+  const filtered = intent ? destinations.filter((d) => d.intent === intent) : [];
 
+  // ---- AI Chat functions ----
+  const sendMessage = async () => {
+    if (!input.trim()) return;
+    const userMessage = { sender: "user", text: input };
+    setMessages((prev) => [...prev, userMessage]);
+    setInput("");
+
+    // Mock AI response
+    setTimeout(() => {
+      const aiMessage = {
+        sender: "ai",
+        text: `🤖 For ${intent} trips, I’d recommend exploring unique destinations!`,
+      };
+      setMessages((prev) => [...prev, aiMessage]);
+    }, 800);
+  };
+
+  // ---- Render ----
   return (
-    <div className="planner-container">
+    <div className="planner-container" style={{ position: "relative" }}>
       {!intent && (
         <div className="intent-section">
           <h2>Choose Your Travel Intent</h2>
@@ -64,7 +87,13 @@ export default function Planner() {
                 key={d.id}
                 title={d.name}
                 subTitle={d.description}
-                header={<img alt={d.name} src={d.image} className="destination-image" />}
+                header={
+                  <img
+                    alt={d.name}
+                    src={d.image}
+                    className="destination-image"
+                  />
+                }
                 className="destination-card"
               >
                 <Button
@@ -76,11 +105,114 @@ export default function Planner() {
               </Card>
             ))}
           </div>
-          <Button
-            label="← Back"
-            className="p-button-text mt-4"
-            onClick={() => setIntent(null)}
-          />
+
+          <div className="flex justify-content-between mt-4">
+            <Button
+              label="← Back"
+              className="p-button-text"
+              onClick={() => setIntent(null)}
+            />
+            <Button
+              label="Ask AI"
+              icon="pi pi-comments"
+              severity="info"
+              onClick={() => setShowChat(!showChat)}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* --- Floating Chat Window --- */}
+      {showChat && (
+        <div
+          style={{
+            position: "fixed",
+            bottom: "1rem",
+            right: "1rem",
+            width: "320px",
+            backgroundColor: "#fff",
+            border: "1px solid #ccc",
+            borderRadius: "10px",
+            boxShadow: "0 2px 8px rgba(0,0,0,0.2)",
+            display: "flex",
+            flexDirection: "column",
+            overflow: "hidden",
+            zIndex: 1000,
+          }}
+        >
+          <div
+            style={{
+              padding: "10px",
+              background: "#f5f5f5",
+              borderBottom: "1px solid #ddd",
+              fontWeight: "bold",
+            }}
+          >
+            🧭 Ask AI about your trip
+          </div>
+
+          {/* Chat messages */}
+          <div
+            style={{
+              padding: "10px",
+              flex: 1,
+              maxHeight: "250px",
+              overflowY: "auto",
+            }}
+          >
+            {messages.length === 0 && (
+              <p style={{ color: "#888", fontSize: "0.9rem" }}>
+                Ask me for ideas or travel tips…
+              </p>
+            )}
+            {messages.map((m, idx) => (
+              <div
+                key={idx}
+                style={{
+                  textAlign: m.sender === "user" ? "right" : "left",
+                  margin: "8px 0",
+                }}
+              >
+                <span
+                  style={{
+                    display: "inline-block",
+                    background:
+                      m.sender === "user" ? "#DCF8C6" : "rgba(240,240,240,0.9)",
+                    padding: "8px 12px",
+                    borderRadius: "15px",
+                    maxWidth: "80%",
+                    wordBreak: "break-word",
+                  }}
+                >
+                  {m.text}
+                </span>
+              </div>
+            ))}
+          </div>
+
+          {/* Input area */}
+          <div
+            style={{
+              display: "flex",
+              borderTop: "1px solid #ccc",
+              padding: "8px",
+              gap: "6px",
+            }}
+          >
+            <InputText
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              placeholder="Type your question..."
+              className="w-full"
+              onKeyDown={(e) => e.key === "Enter" && sendMessage()}
+            />
+            <Button
+              icon="pi pi-send"
+              onClick={sendMessage}
+              rounded
+              severity="info"
+            />
+          </div>
         </div>
       )}
     </div>
