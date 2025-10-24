@@ -66,28 +66,48 @@ export default function Planner() {
   // ---- AI Chat functions ----
   const sendMessage = async () => {
   if (!input.trim()) return;
+
+  // Add user message
   const userMessage = { sender: "user", text: input };
   setMessages((prev) => [...prev, userMessage]);
   setInput("");
+
+  // Add temporary "loading" message
+  const loadingMessage = { sender: "ai", text: "🤖 Thinking..." };
+  setMessages((prev) => [...prev, loadingMessage]);
 
   try {
     const res = await fetch("http://localhost:8000/ask_ai", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ question: input }),
+      body: JSON.stringify({ question: userMessage.text }),
     });
 
     const data = await res.json();
-    const aiReply = data.response || data.message || data.output || "Sorry, I couldn’t generate a response.";
-    setMessages((prev) => [...prev, { sender: "ai", text: aiReply }]);
+
+    // Remove loading message and add AI response
+    setMessages((prev) =>
+      prev
+        .filter((msg) => msg.text !== "🤖 Thinking...")
+        .concat({
+          sender: "ai",
+          text: data.answer || data.response || "⚠️ Sorry, I couldn’t generate a response.",
+        })
+    );
   } catch (err) {
     console.error("AI connection failed:", err);
-    setMessages((prev) => [
-      ...prev,
-      { sender: "ai", text: "⚠️ Sorry, something went wrong connecting to AI." },
-    ]);
+
+    setMessages((prev) =>
+      prev
+        .filter((msg) => msg.text !== "🤖 Thinking...")
+        .concat({
+          sender: "ai",
+          text: "⚠️ Sorry, something went wrong connecting to AI.",
+        })
+    );
   }
 };
+
 
 
   // ---- Render ----
