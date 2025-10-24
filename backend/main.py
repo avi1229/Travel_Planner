@@ -4,8 +4,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pymongo import MongoClient
 import uuid, os, httpx
+from pydantic import BaseModel
 
 app = FastAPI()
+
+class AIRequest(BaseModel):
+    question: str
 
 # ---- CORS ----
 app.add_middleware(
@@ -74,25 +78,22 @@ def get_destinations(category: str = None):
     return {"destinations": items}
 
 # ---- Proxy to Ollama ----
+
 @app.post("/ask_ai")
-async def ask_ai(request: Request):
-    data = await request.json()
-    question = data.get("question", "")
-
-    if not question:
-        return JSONResponse({"error": "Missing question"}, status_code=400)
-
+async def ask_ai(data: AIRequest):
     try:
         async with httpx.AsyncClient() as client:
             response = await client.post(
                 "http://localhost:11434/api/generate",
-                json={"model": "llama3", "prompt": question, "stream": False},
+                json={
+                    "model": "llama3",
+                    "prompt": data.question,
+                    "stream": False,
+                },
                 timeout=120.0,
             )
-            return JSONResponse(response.json())
+
+            result = response.json()
+            return {"answer": result.get("response", "No response from Ollama")}
     except Exception as e:
-        print("Ollama error:", e)
-        return JSONResponse(
-            {"error": "Failed to connect to Ollama", "details": str(e)},
-            status_code=500,
-        )
+        return {"error": str(e)}
