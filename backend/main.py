@@ -4,10 +4,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pymongo import MongoClient
 from ollama import chat
+from pydantic import BaseModel
 import uuid, os
 
 app = FastAPI()
 
+class AIRequest(BaseModel):
+    question: str
 # ---- CORS ----
 app.add_middleware(
     CORSMiddleware,
@@ -74,23 +77,11 @@ def get_destinations(category: str = None):
 
 # ---- Ask AI (Ollama Python SDK) ----
 @app.post("/ask_ai")
-async def ask_ai(question: str):
+async def ask_ai(data: AIRequest):
     try:
-        if not question:
-            return JSONResponse({"error": "Missing question"}, status_code=400)
-
-        # 💬 Use Ollama Python SDK directly
-        response = chat(
-            model="llama3",  # or gemma3, or any other model you have
-            messages=[
-                {"role": "user", "content": question},
-            ],
-        )
-
-        # Extract the model’s message content
-        ai_reply = response.message.content
-
-        return {"response": ai_reply}
-
+        response = chat(model="llama3:latest", messages=[
+            {"role": "user", "content": data.question}
+        ])
+        return {"answer": response["message"]["content"]}
     except Exception as e:
-        return JSONResponse({"error": str(e)}, status_code=500)
+        return {"error": str(e)}
